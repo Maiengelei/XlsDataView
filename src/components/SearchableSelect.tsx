@@ -54,6 +54,13 @@ export default function SearchableSelect({
     }
   }, [editing, selectedOption, value]);
 
+  const chooseOption = (optionValue: string, optionLabel: string): void => {
+    setEditing(false);
+    setOpen(false);
+    setInputText(optionLabel);
+    onChange(optionValue);
+  };
+
   return (
     <div className="searchable-select">
       <input
@@ -167,13 +174,9 @@ export default function SearchableSelect({
                 onMouseDown={(event) => {
                   event.preventDefault();
                   suppressBlurRef.current = true;
+                  chooseOption(option.value, option.label);
                 }}
-                onClick={() => {
-                  setEditing(false);
-                  setOpen(false);
-                  setInputText(option.label);
-                  onChange(option.value);
-                }}
+                onClick={(event) => event.preventDefault()}
               >
                 {option.label}
               </button>
