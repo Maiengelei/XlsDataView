@@ -103,7 +103,11 @@ function renderVerticalChart(params: {
                 const barY = Math.min(y, baselineY);
                 const barHeight = Math.max(Math.abs(baselineY - y), 1);
                 const x = groupStart + seriesIndex * (barWidth + 4);
-                const labelY = value >= 0 ? barY - 4 : barY + barHeight + 12;
+                const labelYRaw = value >= 0 ? barY - 4 : barY + barHeight + 12;
+                const labelY = Math.max(
+                  paddingTop + 11,
+                  Math.min(labelYRaw, paddingTop + innerHeight + 14)
+                );
 
                 return (
                   <g key={`bar-${categoryIndex}-${item.name}`}>
@@ -265,8 +269,21 @@ function renderHorizontalBarChart(params: {
               const rectX = Math.min(baselineX, x);
               const rectWidth = Math.max(Math.abs(x - baselineX), 1);
               const y = groupStartY + seriesIndex * (barHeight + 3);
-              const labelX = value >= 0 ? rectX + rectWidth + 4 : rectX - 4;
-              const labelAnchor = value >= 0 ? 'start' : 'end';
+              const labelXRaw = value >= 0 ? rectX + rectWidth + 4 : rectX - 4;
+              let labelAnchor: 'start' | 'end' = value >= 0 ? 'start' : 'end';
+              let labelX = labelXRaw;
+              const rightLimit = paddingLeft + innerWidth - 4;
+              const leftLimit = paddingLeft + 4;
+
+              if (labelAnchor === 'start' && labelX > rightLimit) {
+                labelX = rightLimit;
+                labelAnchor = 'end';
+              }
+
+              if (labelAnchor === 'end' && labelX < leftLimit) {
+                labelX = leftLimit;
+                labelAnchor = 'start';
+              }
 
               return (
                 <g key={`h-bar-${categoryIndex}-${item.name}`}>
