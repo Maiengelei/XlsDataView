@@ -2,11 +2,16 @@
   "name": "xls-data-view",
   "private": true,
   "version": "0.1.0",
+  "main": "electron/main.cjs",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dev:desktop": "concurrently -k \"npm run dev\" \"wait-on tcp:5173 && electron .\"",
+    "start:desktop": "npm run build && electron .",
+    "pack:win": "npm run build && electron-builder --win --x64",
+    "pack:win:portable": "npm run build && electron-builder --win portable --x64"
   },
   "dependencies": {
     "dexie": "^4.0.8",
@@ -18,7 +23,45 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "concurrently": "^9.1.2",
+    "electron": "^36.3.2",
+    "electron-builder": "^25.1.8",
     "typescript": "^5.5.4",
-    "vite": "^5.3.4"
+    "vite": "^5.3.4",
+    "wait-on": "^8.0.1"
+  },
+  "build": {
+    "appId": "com.xlsdataview.app",
+    "productName": "Xls Data View",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   }
 }

@@ -6,7 +6,7 @@ export interface SeriesMeta {
   headers: string[];
   keyColumn: string;
   keyColumns?: string[];
-  keyMode?: 'keyed' | 'snapshot';
+  keyMode?: 'keyed' | 'snapshot' | 'append';
   rowCount: number;
   updatedAt: number;
   lastFileName: string;

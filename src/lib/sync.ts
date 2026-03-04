@@ -6,7 +6,7 @@ interface SyncParams {
   headers: string[];
   keyColumn?: string;
   keyColumns?: string[];
-  keyMode?: 'keyed' | 'snapshot';
+  keyMode?: 'keyed' | 'snapshot' | 'append';
   rows: RowData[];
   fileName: string;
   deleteMissing: boolean;
@@ -315,12 +315,132 @@ async function syncByKeyed(params: {
   });
 }
 
+function nextRowKeyStart(records: RowRecord[]): number {
+  let maxNumeric = 0;
+
+  records.forEach((record) => {
+    const numeric = Number(record.rowKey);
+    if (!Number.isNaN(numeric) && Number.isFinite(numeric) && numeric > maxNumeric) {
+      maxNumeric = numeric;
+    }
+  });
+
+  return maxNumeric + 1;
+}
+
+async function syncByAppend(params: {
+  series: string;
+  headers: string[];
+  rows: RowData[];
+  fileName: string;
+  mergeByDate?: boolean;
+  dateColumn?: string;
+  onProgress?: (progress: number, message: string) => void;
+}): Promise<ImportStats> {
+  const { series, headers, rows, fileName, mergeByDate, dateColumn, onProgress } = params;
+
+  reportProgress(onProgress, 5, '正在检查系列信息...');
+
+  return db.transaction('rw', db.series, db.rows, async () => {
+    const existingSeries = await db.series.get(series);
+
+    if (existingSeries && !headersMatch(existingSeries.headers, headers)) {
+      throw new Error(`系列 ${series} 的表头与已有数据不一致，已阻止导入。`);
+    }
+
+    if (existingSeries && existingSeries.keyMode === 'keyed') {
+      throw new Error(`系列 ${series} 当前是“键控更新”模式，请使用键控方式导入。`);
+    }
+
+    const oldRecords = await db.rows.where('series').equals(series).toArray();
+    const seenRows = new Set(oldRecords.map((record) => serializeForCompare(record.data, headers)));
+
+    let unchanged = 0;
+    const appendRows: RowData[] = [];
+
+    rows.forEach((row) => {
+      const serialized = serializeForCompare(row, headers);
+      if (seenRows.has(serialized)) {
+        unchanged += 1;
+        return;
+      }
+
+      seenRows.add(serialized);
+      appendRows.push(row);
+    });
+
+    reportProgress(onProgress, 25, '正在计算增量数据...');
+
+    if (appendRows.length > 0) {
+      const start = nextRowKeyStart(oldRecords);
+      const chunkSize = 2000;
+      const total = appendRows.length;
+
+      for (let offset = 0; offset < total; offset += chunkSize) {
+        const chunkRows = appendRows.slice(offset, offset + chunkSize);
+        const payload: RowRecord[] = chunkRows.map((row, index) => ({
+          series,
+          rowKey: String(start + offset + index),
+          data: row
+        }));
+
+        await db.rows.bulkPut(payload);
+
+        const written = Math.min(offset + chunkRows.length, total);
+        const progress = 25 + (written / total) * 65;
+        reportProgress(onProgress, progress, `正在追加数据 (${written}/${total})...`);
+      }
+    }
+
+    const totalAfter = oldRecords.length + appendRows.length;
+    const nextMeta: SeriesMeta = {
+      series,
+      headers,
+      keyColumn: '',
+      keyColumns: [],
+      keyMode: 'append',
+      rowCount: totalAfter,
+      updatedAt: Date.now(),
+      lastFileName: fileName,
+      mergeByDate,
+      dateColumn
+    };
+
+    await db.series.put(nextMeta);
+    reportProgress(onProgress, 100, '增量导入完成');
+
+    return {
+      added: appendRows.length,
+      updated: 0,
+      unchanged,
+      deleted: 0,
+      skippedMissingKey: 0,
+      duplicateKeyOverwritten: 0,
+      totalIncoming: rows.length,
+      totalBefore: oldRecords.length,
+      totalAfter
+    };
+  });
+}
+
 export async function syncSeriesData(params: SyncParams): Promise<ImportStats> {
   const keyMode = params.keyMode ?? 'snapshot';
   const keyColumns = normalizeKeyColumns(params.keyColumns, params.keyColumn);
 
   if (keyMode === 'snapshot') {
     return syncBySnapshot({
+      series: params.series,
+      headers: params.headers,
+      rows: params.rows,
+      fileName: params.fileName,
+      mergeByDate: params.mergeByDate,
+      dateColumn: params.dateColumn,
+      onProgress: params.onProgress
+    });
+  }
+
+  if (keyMode === 'append') {
+    return syncByAppend({
       series: params.series,
       headers: params.headers,
       rows: params.rows,
@@ -352,6 +472,15 @@ export async function clearAllData(): Promise<void> {
   await db.transaction('rw', db.series, db.rows, async () => {
     await db.rows.clear();
     await db.series.clear();
+  });
+}
+
+export async function clearSeriesData(series: string): Promise<number> {
+  return db.transaction('rw', db.series, db.rows, async () => {
+    const removedCount = await db.rows.where('series').equals(series).count();
+    await db.rows.where('series').equals(series).delete();
+    await db.series.delete(series);
+    return removedCount;
   });
 }
 

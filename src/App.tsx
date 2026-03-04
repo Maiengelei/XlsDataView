@@ -1,17 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
 import DropZone from './components/DropZone';
 import FilterPanel from './components/FilterPanel';
-import MultiSeriesChart from './components/MultiSeriesChart';
+import MultiSeriesChart, {
+  type BarOrientation,
+  type MultiChartType
+} from './components/MultiSeriesChart';
 import SearchableMultiSelect from './components/SearchableMultiSelect';
 import SearchableSelect, { type SelectOption } from './components/SearchableSelect';
+import { exportSeriesToXlsx } from './lib/export';
 import { applyFilters } from './lib/filter';
-import { clearAllData, getSeriesRows, listSeriesMeta, syncSeriesData } from './lib/sync';
+import { clearAllData, clearSeriesData, getSeriesRows, listSeriesMeta, syncSeriesData } from './lib/sync';
 import { parseXlsFile } from './lib/xls';
 import type { FilterCondition, ImportStats, ParsedSheet, RowData, SeriesMeta } from './types';
 
 const MAX_RENDER_ROWS = 500;
+const ALL_GROUP_VALUE = 'ALL';
 
 type AppPage = 'results' | 'import' | 'settings';
+type ImportMode = 'snapshot' | 'append';
+type NumericAggregateMode = 'sum' | 'max' | 'min' | 'avg' | 'first' | 'last';
+type TextAggregateMode = 'first' | 'last' | 'uniqueJoin';
 
 interface CompareGroup {
   id: string;
@@ -91,7 +99,12 @@ function uniqueValues(rows: RowData[], column: string): string[] {
   ).sort((left, right) => left.localeCompare(right, 'zh-CN'));
 }
 
-function summarizeColumn(rows: RowData[], column: string): string | number {
+function summarizeColumn(
+  rows: RowData[],
+  column: string,
+  numericMode: NumericAggregateMode,
+  textMode: TextAggregateMode
+): string | number {
   const values = rows
     .map((row) => String(row[column] ?? '').trim())
     .filter((value) => value !== '');
@@ -104,16 +117,45 @@ function summarizeColumn(rows: RowData[], column: string): string | number {
   const allNumeric = parsed.every((value) => value !== null);
 
   if (allNumeric) {
-    return parsed.reduce((sum, value) => sum + (value ?? 0), 0);
+    const numericValues = parsed.map((value) => value ?? 0);
+
+    if (numericValues.length === 1) {
+      return numericValues[0];
+    }
+
+    switch (numericMode) {
+      case 'max':
+        return Math.max(...numericValues);
+      case 'min':
+        return Math.min(...numericValues);
+      case 'avg':
+        return numericValues.reduce((sum, value) => sum + value, 0) / numericValues.length;
+      case 'first':
+        return numericValues[0];
+      case 'last':
+        return numericValues[numericValues.length - 1];
+      case 'sum':
+      default:
+        return numericValues.reduce((sum, value) => sum + value, 0);
+    }
   }
 
-  const distinct = Array.from(new Set(values));
-  if (distinct.length === 1) {
-    return distinct[0];
+  if (values.length === 1) {
+    return values[0];
   }
 
-  const preview = distinct.slice(0, 3).join(' / ');
-  return distinct.length > 3 ? `${preview} ...(${distinct.length}项)` : preview;
+  switch (textMode) {
+    case 'last':
+      return values[values.length - 1];
+    case 'uniqueJoin': {
+      const distinct = Array.from(new Set(values));
+      const preview = distinct.slice(0, 5).join(' / ');
+      return distinct.length > 5 ? `${preview} ...(${distinct.length}项)` : preview;
+    }
+    case 'first':
+    default:
+      return values[0];
+  }
 }
 
 function toOptions(values: string[]): SelectOption[] {
@@ -147,6 +189,22 @@ function makeGroupLabel(group: CompareGroup, groupColumns: string[]): string {
   return groupColumns.map((column) => `${column}: ${group.values[column] ?? ''}`).join(' | ');
 }
 
+function isAllGroupValue(value: string): boolean {
+  return value.trim().toUpperCase() === ALL_GROUP_VALUE;
+}
+
+function modeLabel(mode: SeriesMeta['keyMode']): string {
+  if (mode === 'append') {
+    return '增量追加（整行去重）';
+  }
+
+  if (mode === 'keyed') {
+    return '键控更新';
+  }
+
+  return '整表覆盖（快照）';
+}
+
 export default function App(): JSX.Element {
   const [page, setPage] = useState<AppPage>(pageFromHash(window.location.hash));
 
@@ -157,6 +215,7 @@ export default function App(): JSX.Element {
   const [filters, setFilters] = useState<FilterCondition[]>([]);
 
   const [seriesInput, setSeriesInput] = useState('');
+  const [importMode, setImportMode] = useState<ImportMode>('snapshot');
   const [parsedFile, setParsedFile] = useState<ParsedSheet | null>(null);
   const [fileName, setFileName] = useState('');
 
@@ -164,6 +223,8 @@ export default function App(): JSX.Element {
   const [loading, setLoading] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [exportingSeries, setExportingSeries] = useState('');
+  const [clearingSeries, setClearingSeries] = useState('');
   const [taskProgress, setTaskProgress] = useState(0);
   const [taskMessage, setTaskMessage] = useState('');
   const [error, setError] = useState('');
@@ -178,7 +239,12 @@ export default function App(): JSX.Element {
   const [comparing, setComparing] = useState(false);
   const [compareError, setCompareError] = useState('');
   const [compareResult, setCompareResult] = useState<CompareResultData | null>(null);
-  const [chartType, setChartType] = useState<'bar' | 'line'>('bar');
+  const [numericAggregateMode, setNumericAggregateMode] = useState<NumericAggregateMode>('sum');
+  const [textAggregateMode, setTextAggregateMode] = useState<TextAggregateMode>('first');
+  const [chartType, setChartType] = useState<MultiChartType>('bar');
+  const [barOrientation, setBarOrientation] = useState<BarOrientation>('vertical');
+  const [chartXAxisTitle, setChartXAxisTitle] = useState('数据组');
+  const [chartYAxisTitle, setChartYAxisTitle] = useState('汇总值');
   const [chartColumns, setChartColumns] = useState<string[]>([]);
 
   const selectedMeta = useMemo(
@@ -340,7 +406,7 @@ export default function App(): JSX.Element {
   useEffect(() => {
     setCompareResult(null);
     setCompareError('');
-  }, [filteredRows, groupColumns, compareInfoColumns, compareGroups]);
+  }, [filteredRows, groupColumns, compareInfoColumns, compareGroups, numericAggregateMode, textAggregateMode]);
 
   useEffect(() => {
     setChartColumns((current) => current.filter((column) => chartableColumns.includes(column)));
@@ -408,7 +474,7 @@ export default function App(): JSX.Element {
       const result = await syncSeriesData({
         series,
         headers: parsedFile.headers,
-        keyMode: 'snapshot',
+        keyMode: importMode,
         rows: parsedFile.rows,
         fileName,
         deleteMissing: false,
@@ -419,9 +485,15 @@ export default function App(): JSX.Element {
       });
 
       setStats(result);
-      setInfo(
-        `已完整导入 ${result.totalAfter} 行，并为每行自动生成主键。再次导入同系列会按新文件整表覆盖，避免丢行。`
-      );
+      if (importMode === 'append') {
+        setInfo(
+          `增量导入完成：新增 ${result.added} 行，跳过重复 ${result.unchanged} 行。当前系列共 ${result.totalAfter} 行。`
+        );
+      } else {
+        setInfo(
+          `整表覆盖导入完成：当前系列共 ${result.totalAfter} 行。`
+        );
+      }
       setTaskProgress(100);
       setTaskMessage('导入完成');
 
@@ -437,7 +509,9 @@ export default function App(): JSX.Element {
   };
 
   const handleClearAll = async (): Promise<void> => {
-    const confirmed = window.confirm('确认清空所有系列和数据吗？该操作无法撤销。');
+    const confirmed = window.confirm(
+      `确认清空所有系列和数据吗？当前共 ${seriesList.length} 个系列、${totalRowsInDb} 条数据。该操作无法撤销。`
+    );
     if (!confirmed) {
       return;
     }
@@ -457,6 +531,79 @@ export default function App(): JSX.Element {
     setCompareGroups([]);
     setCompareResult(null);
     setChartColumns([]);
+    setNumericAggregateMode('sum');
+    setTextAggregateMode('first');
+    setChartType('bar');
+    setBarOrientation('vertical');
+    setChartXAxisTitle('数据组');
+    setChartYAxisTitle('汇总值');
+    setExportingSeries('');
+    setClearingSeries('');
+  };
+
+  const handleExportSeries = async (meta: SeriesMeta): Promise<void> => {
+    if (exportingSeries || clearingSeries) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `确认导出系列 ${meta.series} 为 XLSX 吗？将导出 ${meta.rowCount} 行数据。`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setError('');
+    setInfo('');
+    setExportingSeries(meta.series);
+
+    try {
+      const seriesRows = await getSeriesRows(meta.series);
+      await exportSeriesToXlsx({
+        series: meta.series,
+        headers: meta.headers,
+        rows: seriesRows
+      });
+      setInfo(`系列 ${meta.series} 已导出为 XLSX（共 ${seriesRows.length} 行）。`);
+    } catch (exportError) {
+      setError(exportError instanceof Error ? exportError.message : `导出系列 ${meta.series} 失败`);
+    } finally {
+      setExportingSeries('');
+    }
+  };
+
+  const handleClearSeries = async (meta: SeriesMeta): Promise<void> => {
+    if (clearingSeries || exportingSeries) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `确认清空系列 ${meta.series} 吗？将删除该系列 ${meta.rowCount} 行数据，且无法撤销。`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setError('');
+    setInfo('');
+    setClearingSeries(meta.series);
+
+    try {
+      const removedRows = await clearSeriesData(meta.series);
+
+      if (selectedSeries === meta.series) {
+        setSelectedSeries('');
+        setRows([]);
+        setFilters([]);
+      }
+
+      await refreshSeriesList();
+      setInfo(`系列 ${meta.series} 已清空，删除 ${removedRows} 行。`);
+    } catch (clearError) {
+      setError(clearError instanceof Error ? clearError.message : `清空系列 ${meta.series} 失败`);
+    } finally {
+      setClearingSeries('');
+    }
   };
 
   const updateGroupValue = (groupId: string, column: string, value: string): void => {
@@ -522,15 +669,25 @@ export default function App(): JSX.Element {
 
       activeGroups.forEach((group) => {
         const matchedRows = filteredRows.filter((row) =>
-          groupColumns.every(
-            (column) => String(row[column] ?? '').trim() === String(group.values[column] ?? '').trim()
-          )
+          groupColumns.every((column) => {
+            const groupValue = String(group.values[column] ?? '').trim();
+            if (isAllGroupValue(groupValue)) {
+              return true;
+            }
+
+            return String(row[column] ?? '').trim() === groupValue;
+          })
         );
 
         const values: Record<string, string | number> = {};
 
         infoColumnsForComparison.forEach((column) => {
-          values[column] = summarizeColumn(matchedRows, column);
+          values[column] = summarizeColumn(
+            matchedRows,
+            column,
+            numericAggregateMode,
+            textAggregateMode
+          );
         });
 
         const baseLabel = makeGroupLabel(group, groupColumns);
@@ -561,7 +718,7 @@ export default function App(): JSX.Element {
       <section className="card">
         <div className="card-head">
           <h3>数据导入</h3>
-          <span className="muted">自动行主键模式：保留每一行，不需要选择主键列</span>
+          <span className="muted">同系列可选：整表覆盖 或 增量追加（整行去重）</span>
         </div>
 
         <div className="grid two">
@@ -583,6 +740,18 @@ export default function App(): JSX.Element {
               onChange={setSeriesInput}
               placeholder="输入或搜索系列名"
               allowCustom
+            />
+          </label>
+
+          <label>
+            导入策略
+            <SearchableSelect
+              options={[
+                { value: 'snapshot', label: '整表覆盖（快照）' },
+                { value: 'append', label: '增量追加（整行去重）' }
+              ]}
+              value={importMode}
+              onChange={(value) => setImportMode(value === 'append' ? 'append' : 'snapshot')}
             />
           </label>
         </div>
@@ -617,7 +786,9 @@ export default function App(): JSX.Element {
               {parsedFile.rows.length}
             </div>
             <div className="merge-summary muted">
-              导入策略：每行自动分配唯一行 ID 入库，不按业务列去重，不会因键冲突丢弃同日期重复记录。
+              {importMode === 'append'
+                ? '当前策略：增量追加。仅新增“数据库中未存在的整行”，重复整行会自动跳过。'
+                : '当前策略：整表覆盖。再次导入同系列会用新文件替换旧数据。'}
             </div>
             <div className="actions">
               <button
@@ -626,7 +797,7 @@ export default function App(): JSX.Element {
                 onClick={() => void handleImport()}
                 disabled={parsing || importing}
               >
-                {parsing ? '解析中...' : importing ? '导入中...' : '导入并覆盖同系列'}
+                {parsing ? '解析中...' : importing ? '导入中...' : importMode === 'append' ? '增量导入同系列' : '导入并覆盖同系列'}
               </button>
             </div>
           </div>
@@ -685,7 +856,7 @@ export default function App(): JSX.Element {
               {showSeriesMeta &&
                 (selectedMeta ? (
                   <>
-                    <div>导入策略：自动行主键（整表快照）</div>
+                    <div>导入策略：{modeLabel(selectedMeta.keyMode)}</div>
                     <div>上次导入：{selectedMeta.lastFileName}</div>
                     <div>更新时间：{formatTime(selectedMeta.updatedAt)}</div>
                   </>
@@ -739,6 +910,53 @@ export default function App(): JSX.Element {
                 生效信息列：{infoColumnsForComparison.length} 个
               </div>
 
+              <div className="grid two top-gap">
+                <label>
+                  多行匹配时数值取值方式
+                  <SearchableSelect
+                    options={[
+                      { value: 'sum', label: '求和' },
+                      { value: 'max', label: '最大值' },
+                      { value: 'min', label: '最小值' },
+                      { value: 'avg', label: '平均值' },
+                      { value: 'first', label: '首条' },
+                      { value: 'last', label: '末条' }
+                    ]}
+                    value={numericAggregateMode}
+                    onChange={(value) => {
+                      const next: NumericAggregateMode[] = ['sum', 'max', 'min', 'avg', 'first', 'last'];
+                      setNumericAggregateMode(
+                        next.includes(value as NumericAggregateMode)
+                          ? (value as NumericAggregateMode)
+                          : 'sum'
+                      );
+                    }}
+                  />
+                </label>
+
+                <label>
+                  多行匹配时文本取值方式
+                  <SearchableSelect
+                    options={[
+                      { value: 'first', label: '首条' },
+                      { value: 'last', label: '末条' },
+                      { value: 'uniqueJoin', label: '去重合并' }
+                    ]}
+                    value={textAggregateMode}
+                    onChange={(value) => {
+                      const next: TextAggregateMode[] = ['first', 'last', 'uniqueJoin'];
+                      setTextAggregateMode(
+                        next.includes(value as TextAggregateMode)
+                          ? (value as TextAggregateMode)
+                          : 'first'
+                      );
+                    }}
+                  />
+                </label>
+              </div>
+
+              <p className="muted">以上取值方式仅在“匹配行数大于 1”时生效。</p>
+
               <div className="card top-gap">
                 <div className="card-head">
                   <h3>数据组配置</h3>
@@ -787,10 +1005,14 @@ export default function App(): JSX.Element {
                             <label key={`${group.id}-${column}`}>
                               {column}
                               <SearchableSelect
-                                options={[{ value: '', label: '请选择' }, ...toOptions(groupValueOptionsMap[column] ?? [])]}
+                                options={[
+                                  { value: '', label: '请选择' },
+                                  { value: ALL_GROUP_VALUE, label: 'ALL（全部）' },
+                                  ...toOptions(groupValueOptionsMap[column] ?? [])
+                                ]}
                                 value={group.values[column] ?? ''}
                                 onChange={(value) => updateGroupValue(group.id, column, value)}
-                                placeholder={`搜索或输入 ${column}`}
+                                placeholder={`搜索/输入 ${column}，或输入 ALL`}
                                 allowCustom
                               />
                             </label>
@@ -822,10 +1044,15 @@ export default function App(): JSX.Element {
                             <SearchableSelect
                               options={[
                                 { value: 'bar', label: '柱状图' },
-                                { value: 'line', label: '折线图' }
+                                { value: 'line', label: '折线图' },
+                                { value: 'area', label: '面积图' },
+                                { value: 'scatter', label: '散点图' }
                               ]}
                               value={chartType}
-                              onChange={(value) => setChartType(value === 'line' ? 'line' : 'bar')}
+                              onChange={(value) => {
+                                const next: MultiChartType[] = ['bar', 'line', 'area', 'scatter'];
+                                setChartType(next.includes(value as MultiChartType) ? (value as MultiChartType) : 'bar');
+                              }}
                             />
                           </label>
 
@@ -840,7 +1067,54 @@ export default function App(): JSX.Element {
                           </label>
                         </div>
 
-                        <MultiSeriesChart categories={chartCategories} series={chartSeries} type={chartType} />
+                        <div className="grid two top-gap">
+                          <label>
+                            X 轴标题
+                            <input
+                              type="text"
+                              value={chartXAxisTitle}
+                              placeholder="例如：数据组"
+                              onChange={(event) => setChartXAxisTitle(event.target.value)}
+                            />
+                          </label>
+
+                          <label>
+                            Y 轴标题
+                            <input
+                              type="text"
+                              value={chartYAxisTitle}
+                              placeholder="例如：数值"
+                              onChange={(event) => setChartYAxisTitle(event.target.value)}
+                            />
+                          </label>
+                        </div>
+
+                        {chartType === 'bar' && (
+                          <div className="grid two top-gap">
+                            <label>
+                              柱状图方向
+                              <SearchableSelect
+                                options={[
+                                  { value: 'vertical', label: '纵向（默认）' },
+                                  { value: 'horizontal', label: '横向' }
+                                ]}
+                                value={barOrientation}
+                                onChange={(value) =>
+                                  setBarOrientation(value === 'horizontal' ? 'horizontal' : 'vertical')
+                                }
+                              />
+                            </label>
+                          </div>
+                        )}
+
+                        <MultiSeriesChart
+                          categories={chartCategories}
+                          series={chartSeries}
+                          type={chartType}
+                          barOrientation={barOrientation}
+                          xAxisTitle={chartXAxisTitle}
+                          yAxisTitle={chartYAxisTitle}
+                        />
                       </>
                     )}
                   </section>
@@ -951,6 +1225,7 @@ export default function App(): JSX.Element {
                 <th>行数</th>
                 <th>导入策略</th>
                 <th>更新时间</th>
+                <th>操作</th>
               </tr>
             </thead>
             <tbody>
@@ -958,8 +1233,28 @@ export default function App(): JSX.Element {
                 <tr key={item.series}>
                   <td>{item.series}</td>
                   <td>{item.rowCount}</td>
-                  <td>自动行主键（整表快照）</td>
+                  <td>{modeLabel(item.keyMode)}</td>
                   <td>{formatTime(item.updatedAt)}</td>
+                  <td>
+                    <div className="series-actions">
+                      <button
+                        type="button"
+                        className="button secondary"
+                        onClick={() => void handleExportSeries(item)}
+                        disabled={Boolean(exportingSeries) || Boolean(clearingSeries)}
+                      >
+                        {exportingSeries === item.series ? '导出中...' : '导出 XLSX'}
+                      </button>
+                      <button
+                        type="button"
+                        className="button danger"
+                        onClick={() => void handleClearSeries(item)}
+                        disabled={Boolean(clearingSeries) || Boolean(exportingSeries)}
+                      >
+                        {clearingSeries === item.series ? '清空中...' : '清空系列'}
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -1,4 +1,9 @@
-import type { FilterCondition, FilterOperator, RowData } from '../types';
+import {
+  ALL_FIELDS_FILTER_COLUMN,
+  type FilterCondition,
+  type FilterOperator,
+  type RowData
+} from '../types';
 import SearchableSelect, { type SelectOption } from './SearchableSelect';
 
 interface FilterPanelProps {
@@ -41,7 +46,10 @@ export default function FilterPanel({ headers, rows, filters, onChange }: Filter
     onChange(filters.map((item) => (item.id === id ? { ...item, ...patch } : item)));
   };
 
-  const headerOptions: SelectOption[] = headers.map((header) => ({ label: header, value: header }));
+  const headerOptions: SelectOption[] = [
+    { label: '全部字段', value: ALL_FIELDS_FILTER_COLUMN },
+    ...headers.map((header) => ({ label: header, value: header }))
+  ];
 
   return (
     <section className="card">
@@ -55,8 +63,8 @@ export default function FilterPanel({ headers, rows, filters, onChange }: Filter
               ...filters,
               {
                 id: crypto.randomUUID(),
-                column: headers[0] ?? '',
-                operator: 'contains',
+                column: '',
+                operator: 'equals',
                 value: ''
               }
             ])
@@ -86,7 +94,11 @@ export default function FilterPanel({ headers, rows, filters, onChange }: Filter
               />
 
               <SearchableSelect
-                options={uniqueColumnValues(rows, filter.column).map((value) => ({ value, label: value }))}
+                options={
+                  filter.column === ALL_FIELDS_FILTER_COLUMN
+                    ? []
+                    : uniqueColumnValues(rows, filter.column).map((value) => ({ value, label: value }))
+                }
                 value={filter.value}
                 placeholder="搜索或输入筛选值"
                 allowCustom

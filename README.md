@@ -33,6 +33,40 @@ npm install
 npm run dev
 ```
 
+## Windows 打包（桌面应用）
+
+已接入 Electron + electron-builder，可打包独立 Windows 应用。
+
+### 首次准备
+
+```bash
+npm install
+```
+
+### 本地桌面调试
+
+```bash
+npm run dev:desktop
+```
+
+### 生成 Windows 安装包（NSIS + Portable）
+
+```bash
+npm run pack:win
+```
+
+输出目录：`release/`
+
+### 仅生成便携版
+
+```bash
+npm run pack:win:portable
+```
+
+说明：
+- 建议在 Windows 系统上执行 `pack:win`，产物兼容性最好。
+- 应用数据默认保存在 Electron 用户目录（长期使用可持续保留本地数据库）。
+
 ## 使用说明
 
 1. 进入“数据导入”页，输入系列名并拖拽文件
@@ -45,6 +79,7 @@ npm run dev
 
 - 自动行主键：每行都保留，不按业务列去重
 - 同系列覆盖：再次导入同系列时，用新文件完整替换旧数据
+- 同系列增量追加：仅追加数据库中不存在的整行，重复整行自动跳过
 - 如果你需要保留历史版本，请使用不同系列名（例如 `trap_daily_2025_09_03`）
 
 ## 清空全部数据
