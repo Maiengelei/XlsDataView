@@ -67,6 +67,22 @@ npm run pack:win:portable
 - 建议在 Windows 系统上执行 `pack:win`，产物兼容性最好。
 - 应用数据默认保存在 Electron 用户目录（长期使用可持续保留本地数据库）。
 
+## GitHub Actions 手动发布 EXE
+
+项目内置了手动触发的工作流：`.github/workflows/manual-win-release.yml`
+
+使用方式：
+1. 打开 GitHub 仓库的 `Actions` 页面
+2. 选择 `Manual Windows EXE Release`
+3. 点击 `Run workflow`
+4. 输入 `tag_name`（例如 `v1.0.0`），可选填写 `release_name`
+5. 选择是否 `draft` / `prerelease` 后运行
+
+执行结果：
+- 自动在 Windows Runner 打包 EXE
+- 在当前仓库创建 GitHub Release 并上传安装包/便携版
+- 同时在 Workflow Artifacts 中保留构建产物
+
 ## 使用说明
 
 1. 进入“数据导入”页，输入系列名并拖拽文件
