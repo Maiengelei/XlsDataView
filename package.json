@@ -10,8 +10,8 @@
     "preview": "vite preview",
     "dev:desktop": "concurrently -k \"npm run dev\" \"wait-on tcp:5173 && electron .\"",
     "start:desktop": "npm run build && electron .",
-    "pack:win": "npm run build && electron-builder --win --x64",
-    "pack:win:portable": "npm run build && electron-builder --win portable --x64"
+    "pack:win": "npm run build && electron-builder --win --x64 --publish never",
+"pack:win:portable": "npm run build && electron-builder --win portable --x64 --publish never"
   },
   "dependencies": {
     "dexie": "^4.0.8",
