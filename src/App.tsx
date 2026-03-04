@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import DropZone from './components/DropZone';
 import FilterPanel from './components/FilterPanel';
+import MultiSeriesChart from './components/MultiSeriesChart';
 import SearchableMultiSelect from './components/SearchableMultiSelect';
 import SearchableSelect, { type SelectOption } from './components/SearchableSelect';
 import { applyFilters } from './lib/filter';
@@ -177,6 +178,8 @@ export default function App(): JSX.Element {
   const [comparing, setComparing] = useState(false);
   const [compareError, setCompareError] = useState('');
   const [compareResult, setCompareResult] = useState<CompareResultData | null>(null);
+  const [chartType, setChartType] = useState<'bar' | 'line'>('bar');
+  const [chartColumns, setChartColumns] = useState<string[]>([]);
 
   const selectedMeta = useMemo(
     () => seriesList.find((item) => item.series === selectedSeries) ?? null,
@@ -217,6 +220,48 @@ export default function App(): JSX.Element {
 
     return map;
   }, [groupColumns, filteredRows]);
+
+  const chartableColumns = useMemo(() => {
+    if (!compareResult) {
+      return [];
+    }
+
+    return compareResult.infoColumns.filter((column) =>
+      compareResult.rows.some((row) => typeof row.values[column] === 'number')
+    );
+  }, [compareResult]);
+
+  const selectedChartColumns = useMemo(
+    () =>
+      chartColumns.length > 0
+        ? chartColumns.filter((column) => chartableColumns.includes(column))
+        : chartableColumns,
+    [chartColumns, chartableColumns]
+  );
+
+  const chartCategories = useMemo(
+    () => compareResult?.rows.map((row) => row.groupLabel) ?? [],
+    [compareResult]
+  );
+
+  const chartSeries = useMemo(() => {
+    if (!compareResult) {
+      return [];
+    }
+
+    return selectedChartColumns.map((column) => ({
+      name: column,
+      values: compareResult.rows.map((row) => {
+        const value = row.values[column];
+        if (typeof value === 'number') {
+          return value;
+        }
+
+        const parsed = asNumber(String(value ?? ''));
+        return parsed ?? 0;
+      })
+    }));
+  }, [compareResult, selectedChartColumns]);
 
   const refreshSeriesList = async (): Promise<void> => {
     const list = await listSeriesMeta();
@@ -296,6 +341,10 @@ export default function App(): JSX.Element {
     setCompareResult(null);
     setCompareError('');
   }, [filteredRows, groupColumns, compareInfoColumns, compareGroups]);
+
+  useEffect(() => {
+    setChartColumns((current) => current.filter((column) => chartableColumns.includes(column)));
+  }, [chartableColumns]);
 
   const handleFileSelected = async (file: File): Promise<void> => {
     if (parsing || importing) {
@@ -407,6 +456,7 @@ export default function App(): JSX.Element {
     setCompareInfoColumns([]);
     setCompareGroups([]);
     setCompareResult(null);
+    setChartColumns([]);
   };
 
   const updateGroupValue = (groupId: string, column: string, value: string): void => {
@@ -646,7 +696,7 @@ export default function App(): JSX.Element {
           </div>
         </section>
 
-        <FilterPanel headers={viewHeaders} filters={filters} onChange={setFilters} />
+        <FilterPanel headers={viewHeaders} rows={rows} filters={filters} onChange={setFilters} />
 
         <section className="card">
           <div className="card-head">
@@ -755,30 +805,71 @@ export default function App(): JSX.Element {
               {compareError && <p className="error top-gap">{compareError}</p>}
 
               {compareResult && (
-                <div className="table-wrap top-gap">
-                  <table className="compare-table">
-                    <thead>
-                      <tr>
-                        <th>数据组</th>
-                        <th>匹配行数</th>
-                        {compareResult.infoColumns.map((column) => (
-                          <th key={column}>{column}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {compareResult.rows.map((row) => (
-                        <tr key={row.groupLabel}>
-                          <td>{row.groupLabel}</td>
-                          <td>{row.matchedCount}</td>
+                <>
+                  <section className="card top-gap">
+                    <div className="card-head">
+                      <h3>比对图表</h3>
+                      <span className="muted">图表仅展示可数值化的信息列</span>
+                    </div>
+
+                    {chartableColumns.length === 0 ? (
+                      <p className="muted">当前结果没有可绘图的数值列，请调整信息列后重试。</p>
+                    ) : (
+                      <>
+                        <div className="grid two">
+                          <label>
+                            图表类型
+                            <SearchableSelect
+                              options={[
+                                { value: 'bar', label: '柱状图' },
+                                { value: 'line', label: '折线图' }
+                              ]}
+                              value={chartType}
+                              onChange={(value) => setChartType(value === 'line' ? 'line' : 'bar')}
+                            />
+                          </label>
+
+                          <label>
+                            图表参数（可多选，不选=全部数值列）
+                            <SearchableMultiSelect
+                              options={toOptions(chartableColumns)}
+                              values={chartColumns}
+                              onChange={setChartColumns}
+                              placeholder="搜索图表参数列"
+                            />
+                          </label>
+                        </div>
+
+                        <MultiSeriesChart categories={chartCategories} series={chartSeries} type={chartType} />
+                      </>
+                    )}
+                  </section>
+
+                  <div className="table-wrap top-gap">
+                    <table className="compare-table">
+                      <thead>
+                        <tr>
+                          <th>数据组</th>
+                          <th>匹配行数</th>
                           {compareResult.infoColumns.map((column) => (
-                            <td key={column}>{formatCompareValue(row.values[column] ?? '')}</td>
+                            <th key={column}>{column}</th>
                           ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {compareResult.rows.map((row) => (
+                          <tr key={row.groupLabel}>
+                            <td>{row.groupLabel}</td>
+                            <td>{row.matchedCount}</td>
+                            {compareResult.infoColumns.map((column) => (
+                              <td key={column}>{formatCompareValue(row.values[column] ?? '')}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </>
           )}

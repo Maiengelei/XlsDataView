@@ -38,9 +38,14 @@ export default function SearchableSelect({
             return;
           }
 
+          const normalizedValue = value.trim();
+          if (!normalizedValue) {
+            return;
+          }
+
           const hasValue = options.some((option) => option.value === value);
           if (!hasValue) {
-            onChange(options[0]?.value ?? '');
+            onChange('');
           }
         }}
       />

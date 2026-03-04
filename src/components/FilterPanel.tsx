@@ -1,21 +1,42 @@
-import type { FilterCondition, FilterOperator } from '../types';
+import type { FilterCondition, FilterOperator, RowData } from '../types';
 import SearchableSelect, { type SelectOption } from './SearchableSelect';
 
 interface FilterPanelProps {
   headers: string[];
+  rows: RowData[];
   filters: FilterCondition[];
   onChange: (filters: FilterCondition[]) => void;
 }
 
 const OPERATORS: SelectOption[] = [
   { label: '包含', value: 'contains' },
+  { label: '不包含', value: 'notContains' },
   { label: '等于', value: 'equals' },
+  { label: '不等于', value: 'notEquals' },
   { label: '前缀匹配', value: 'startsWith' },
   { label: '大于', value: 'gt' },
-  { label: '小于', value: 'lt' }
+  { label: '大于等于', value: 'gte' },
+  { label: '小于', value: 'lt' },
+  { label: '小于等于', value: 'lte' }
 ];
 
-export default function FilterPanel({ headers, filters, onChange }: FilterPanelProps): JSX.Element {
+function uniqueColumnValues(rows: RowData[], column: string, limit = 300): string[] {
+  if (!column) {
+    return [];
+  }
+
+  const values = Array.from(
+    new Set(
+      rows
+        .map((row) => String(row[column] ?? '').trim())
+        .filter((value) => value !== '')
+    )
+  ).sort((left, right) => left.localeCompare(right, 'zh-CN'));
+
+  return values.slice(0, limit);
+}
+
+export default function FilterPanel({ headers, rows, filters, onChange }: FilterPanelProps): JSX.Element {
   const updateOne = (id: string, patch: Partial<FilterCondition>): void => {
     onChange(filters.map((item) => (item.id === id ? { ...item, ...patch } : item)));
   };
@@ -64,11 +85,12 @@ export default function FilterPanel({ headers, filters, onChange }: FilterPanelP
                 onChange={(next) => updateOne(filter.id, { operator: next as FilterOperator })}
               />
 
-              <input
-                type="text"
+              <SearchableSelect
+                options={uniqueColumnValues(rows, filter.column).map((value) => ({ value, label: value }))}
                 value={filter.value}
-                placeholder="筛选值"
-                onChange={(event) => updateOne(filter.id, { value: event.target.value })}
+                placeholder="搜索或输入筛选值"
+                allowCustom
+                onChange={(next) => updateOne(filter.id, { value: next })}
               />
 
               <button

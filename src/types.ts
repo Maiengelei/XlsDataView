@@ -1,4 +1,5 @@
 export type RowData = Record<string, string>;
+export const ALL_FIELDS_FILTER_COLUMN = '__ALL_FIELDS__';
 
 export interface SeriesMeta {
   series: string;
@@ -46,7 +47,16 @@ export interface ConsolidationSummary {
   emptyDateCount: number;
 }
 
-export type FilterOperator = 'contains' | 'equals' | 'startsWith' | 'gt' | 'lt';
+export type FilterOperator =
+  | 'contains'
+  | 'notContains'
+  | 'equals'
+  | 'notEquals'
+  | 'startsWith'
+  | 'gt'
+  | 'gte'
+  | 'lt'
+  | 'lte';
 
 export interface FilterCondition {
   id: string;

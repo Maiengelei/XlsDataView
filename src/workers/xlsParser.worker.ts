@@ -50,6 +50,54 @@ function isCsvFile(fileName: string): boolean {
   return fileName.toLowerCase().endsWith('.csv');
 }
 
+function isLikelyDateHeader(header: string): boolean {
+  const normalized = header.trim().toLowerCase();
+  return ['日期', 'date', 'day', '时间', 'time'].some((keyword) =>
+    normalized.includes(keyword)
+  );
+}
+
+function normalizeDateParts(year: number, month: number, day: number): string | null {
+  if (year < 1900 || month < 1 || month > 12 || day < 1 || day > 31) {
+    return null;
+  }
+
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return `${year}/${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}`;
+}
+
+function normalizeDateText(value: string): string {
+  const text = value.trim();
+  if (!text) {
+    return '';
+  }
+
+  const token = text.split(/\s+/)[0].replace(/[.]/g, '/').replace(/-/g, '/');
+  const ymd = token.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+  if (ymd) {
+    const normalized = normalizeDateParts(Number(ymd[1]), Number(ymd[2]), Number(ymd[3]));
+    return normalized ?? text;
+  }
+
+  const mdy = token.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (mdy) {
+    const yearRaw = Number(mdy[3]);
+    const year = mdy[3].length === 2 ? 2000 + yearRaw : yearRaw;
+    const normalized = normalizeDateParts(year, Number(mdy[1]), Number(mdy[2]));
+    return normalized ?? text;
+  }
+
+  return text;
+}
+
 function decodeWith(encoding: string, bytes: Uint8Array): string | null {
   try {
     return new TextDecoder(encoding).decode(bytes);
@@ -91,7 +139,7 @@ async function parseFile(fileName: string, buffer: ArrayBuffer): Promise<ParsedS
   postProgress(15, '正在读取工作表...');
   const workbook = isCsvFile(fileName)
     ? XLSX.read(decodeCsvText(buffer), { type: 'string', raw: false })
-    : XLSX.read(buffer, { type: 'array' });
+    : XLSX.read(buffer, { type: 'array', cellDates: true });
 
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) {
@@ -102,6 +150,7 @@ async function parseFile(fileName: string, buffer: ArrayBuffer): Promise<ParsedS
   const grid = XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
     header: 1,
     raw: false,
+    dateNF: 'yyyy/mm/dd',
     defval: ''
   });
 
@@ -113,6 +162,9 @@ async function parseFile(fileName: string, buffer: ArrayBuffer): Promise<ParsedS
 
   const headerRow = grid[headerRowIndex] ?? [];
   const headers = makeUniqueHeaders(headerRow.map((value) => String(value ?? '').trim()));
+  const dateColumnIndexes = new Set(
+    headers.map((header, index) => (isLikelyDateHeader(header) ? index : -1)).filter((index) => index >= 0)
+  );
 
   const rows: RowData[] = [];
   let lastProgress = 40;
@@ -127,7 +179,8 @@ async function parseFile(fileName: string, buffer: ArrayBuffer): Promise<ParsedS
 
     const record: RowData = {};
     headers.forEach((header, columnIndex) => {
-      record[header] = String(row[columnIndex] ?? '').trim();
+      const rawValue = String(row[columnIndex] ?? '').trim();
+      record[header] = dateColumnIndexes.has(columnIndex) ? normalizeDateText(rawValue) : rawValue;
     });
     rows.push(record);
 
