@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 export interface SelectOption {
   value: string;
@@ -25,6 +25,7 @@ export default function SearchableSelect({
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [inputText, setInputText] = useState('');
+  const suppressBlurRef = useRef(false);
 
   const selectedOption = useMemo(
     () => options.find((option) => option.value === value) ?? null,
@@ -46,6 +47,12 @@ export default function SearchableSelect({
         option.label.toLowerCase().includes(normalized) || option.value.toLowerCase().includes(normalized)
     );
   }, [editing, normalized, options]);
+
+  useEffect(() => {
+    if (!editing) {
+      setInputText(selectedOption?.label ?? value);
+    }
+  }, [editing, selectedOption, value]);
 
   return (
     <div className="searchable-select">
@@ -104,7 +111,18 @@ export default function SearchableSelect({
         onBlur={() => {
           setTimeout(() => setOpen(false), 120);
 
+          if (suppressBlurRef.current) {
+            suppressBlurRef.current = false;
+            setEditing(false);
+            return;
+          }
+
           if (allowCustom) {
+            return;
+          }
+
+          if (!editing) {
+            setInputText(selectedOption?.label ?? value);
             return;
           }
 
@@ -146,10 +164,14 @@ export default function SearchableSelect({
                 type="button"
                 key={option.value}
                 className={`searchable-select-item ${option.value === value ? 'active' : ''}`}
-                onMouseDown={(event) => event.preventDefault()}
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  suppressBlurRef.current = true;
+                }}
                 onClick={() => {
                   setEditing(false);
                   setOpen(false);
+                  setInputText(option.label);
                   onChange(option.value);
                 }}
               >

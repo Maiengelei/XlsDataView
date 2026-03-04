@@ -215,7 +215,7 @@ export default function App(): JSX.Element {
   const [filters, setFilters] = useState<FilterCondition[]>([]);
 
   const [seriesInput, setSeriesInput] = useState('');
-  const [importMode, setImportMode] = useState<ImportMode>('snapshot');
+  const [importMode, setImportMode] = useState<ImportMode>('append');
   const [parsedFile, setParsedFile] = useState<ParsedSheet | null>(null);
   const [fileName, setFileName] = useState('');
 
