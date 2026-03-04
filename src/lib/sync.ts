@@ -101,7 +101,7 @@ async function syncBySnapshot(params: {
     const existingSeries = await db.series.get(series);
 
     if (existingSeries && !headersMatch(existingSeries.headers, headers)) {
-      throw new Error(`系列 ${series} 的表头与已有数据不一致，已阻止导入。`);
+      throw new Error(`系列 ${series} 的表头与已有数据不一致，已阻止导入`);
     }
 
     const oldRecords = await db.rows.where('series').equals(series).toArray();
@@ -201,7 +201,7 @@ async function syncByKeyed(params: {
 
   if (duplicateKeyOverwritten > 0) {
     throw new Error(
-      `检测到 ${duplicateKeyOverwritten} 行键值重复。为防止丢数据已阻止导入，请增加复合键列，或切换到“快照覆盖（无主键）”。`
+      `检测到 ${duplicateKeyOverwritten} 行键值重复为防止丢数据已阻止导入，请增加复合键列，或切换到“快照覆盖（无主键）”`
     );
   }
 
@@ -210,12 +210,12 @@ async function syncByKeyed(params: {
 
     if (existingSeries) {
       if (!headersMatch(existingSeries.headers, headers)) {
-        throw new Error(`系列 ${series} 的表头与已有数据不一致，已阻止导入。`);
+        throw new Error(`系列 ${series} 的表头与已有数据不一致，已阻止导入`);
       }
 
       const existingMode = existingSeries.keyMode ?? 'keyed';
       if (existingMode !== 'keyed') {
-        throw new Error(`系列 ${series} 当前是“快照覆盖”模式，请保持同一模式导入。`);
+        throw new Error(`系列 ${series} 当前是“快照覆盖”模式，请保持同一模式导入`);
       }
 
       const existingKeyColumns =
@@ -229,7 +229,7 @@ async function syncByKeyed(params: {
         throw new Error(
           `系列 ${series} 的键列为 [${existingKeyColumns.join(', ')}]，当前为 [${keyColumns.join(
             ', '
-          )}]，请保持一致。`
+          )}]，请保持一致`
         );
       }
     }
@@ -345,11 +345,11 @@ async function syncByAppend(params: {
     const existingSeries = await db.series.get(series);
 
     if (existingSeries && !headersMatch(existingSeries.headers, headers)) {
-      throw new Error(`系列 ${series} 的表头与已有数据不一致，已阻止导入。`);
+      throw new Error(`系列 ${series} 的表头与已有数据不一致，已阻止导入`);
     }
 
     if (existingSeries && existingSeries.keyMode === 'keyed') {
-      throw new Error(`系列 ${series} 当前是“键控更新”模式，请使用键控方式导入。`);
+      throw new Error(`系列 ${series} 当前是“键控更新”模式，请使用键控方式导入`);
     }
 
     const oldRecords = await db.rows.where('series').equals(series).toArray();
@@ -452,7 +452,7 @@ export async function syncSeriesData(params: SyncParams): Promise<ImportStats> {
   }
 
   if (keyColumns.length === 0) {
-    throw new Error('键控更新模式至少需要 1 个键列。');
+    throw new Error('键控更新模式至少需要 1 个键列');
   }
 
   return syncByKeyed({

@@ -76,7 +76,7 @@ export default function FilterPanel({ headers, rows, filters, onChange }: Filter
       </div>
 
       {filters.length === 0 ? (
-        <p className="muted">暂无筛选器，点击“添加筛选”开始。</p>
+        <p className="muted">暂无筛选器，点击“添加筛选”开始</p>
       ) : (
         <div className="filters">
           {filters.map((filter) => (

@@ -37,7 +37,7 @@ function formatValue(value: number): string {
 
 export default function CompareChart({ data, type, leftLabel, rightLabel }: CompareChartProps): JSX.Element {
   if (data.length === 0) {
-    return <p className="muted">暂无可绘制数据，请调整筛选和比对条件。</p>;
+    return <p className="muted">暂无可绘制数据，请调整筛选和比对条件</p>;
   }
 
   const height = 340;

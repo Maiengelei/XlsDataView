@@ -103,17 +103,28 @@ function renderVerticalChart(params: {
                 const barY = Math.min(y, baselineY);
                 const barHeight = Math.max(Math.abs(baselineY - y), 1);
                 const x = groupStart + seriesIndex * (barWidth + 4);
+                const labelY = value >= 0 ? barY - 4 : barY + barHeight + 12;
 
                 return (
-                  <rect
-                    key={`bar-${categoryIndex}-${item.name}`}
-                    x={x}
-                    y={barY}
-                    width={barWidth}
-                    height={barHeight}
-                    fill={COLORS[seriesIndex % COLORS.length]}
-                    opacity="0.86"
-                  />
+                  <g key={`bar-${categoryIndex}-${item.name}`}>
+                    <rect
+                      x={x}
+                      y={barY}
+                      width={barWidth}
+                      height={barHeight}
+                      fill={COLORS[seriesIndex % COLORS.length]}
+                      opacity="0.86"
+                    />
+                    <text
+                      x={x + barWidth / 2}
+                      y={labelY}
+                      textAnchor="middle"
+                      fontSize="10"
+                      fill="#334155"
+                    >
+                      {formatValue(value)}
+                    </text>
+                  </g>
                 );
               })}
 
@@ -254,17 +265,29 @@ function renderHorizontalBarChart(params: {
               const rectX = Math.min(baselineX, x);
               const rectWidth = Math.max(Math.abs(x - baselineX), 1);
               const y = groupStartY + seriesIndex * (barHeight + 3);
+              const labelX = value >= 0 ? rectX + rectWidth + 4 : rectX - 4;
+              const labelAnchor = value >= 0 ? 'start' : 'end';
 
               return (
-                <rect
-                  key={`h-bar-${categoryIndex}-${item.name}`}
-                  x={rectX}
-                  y={y}
-                  width={rectWidth}
-                  height={barHeight}
-                  fill={COLORS[seriesIndex % COLORS.length]}
-                  opacity="0.86"
-                />
+                <g key={`h-bar-${categoryIndex}-${item.name}`}>
+                  <rect
+                    x={rectX}
+                    y={y}
+                    width={rectWidth}
+                    height={barHeight}
+                    fill={COLORS[seriesIndex % COLORS.length]}
+                    opacity="0.86"
+                  />
+                  <text
+                    x={labelX}
+                    y={y + barHeight / 2 + 3}
+                    textAnchor={labelAnchor}
+                    fontSize="10"
+                    fill="#334155"
+                  >
+                    {formatValue(value)}
+                  </text>
+                </g>
               );
             })}
           </g>
@@ -304,7 +327,7 @@ export default function MultiSeriesChart({
   yAxisTitle = 'Y 轴'
 }: MultiSeriesChartProps): JSX.Element {
   if (categories.length === 0 || series.length === 0) {
-    return <p className="muted">暂无可绘制数据。</p>;
+    return <p className="muted">暂无可绘制数据</p>;
   }
 
   return (

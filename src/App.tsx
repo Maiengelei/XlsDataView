@@ -487,11 +487,11 @@ export default function App(): JSX.Element {
       setStats(result);
       if (importMode === 'append') {
         setInfo(
-          `增量导入完成：新增 ${result.added} 行，跳过重复 ${result.unchanged} 行。当前系列共 ${result.totalAfter} 行。`
+          `增量导入完成：新增 ${result.added} 行，跳过重复 ${result.unchanged} 行当前系列共 ${result.totalAfter} 行`
         );
       } else {
         setInfo(
-          `整表覆盖导入完成：当前系列共 ${result.totalAfter} 行。`
+          `整表覆盖导入完成：当前系列共 ${result.totalAfter} 行`
         );
       }
       setTaskProgress(100);
@@ -510,7 +510,7 @@ export default function App(): JSX.Element {
 
   const handleClearAll = async (): Promise<void> => {
     const confirmed = window.confirm(
-      `确认清空所有系列和数据吗？当前共 ${seriesList.length} 个系列、${totalRowsInDb} 条数据。该操作无法撤销。`
+      `确认清空所有系列和数据吗？当前共 ${seriesList.length} 个系列、${totalRowsInDb} 条数据该操作无法撤销`
     );
     if (!confirmed) {
       return;
@@ -525,7 +525,7 @@ export default function App(): JSX.Element {
     setParsedFile(null);
     setFileName('');
     setError('');
-    setInfo('已清空所有本地数据。');
+    setInfo('已清空所有本地数据');
     setGroupColumns([]);
     setCompareInfoColumns([]);
     setCompareGroups([]);
@@ -547,7 +547,7 @@ export default function App(): JSX.Element {
     }
 
     const confirmed = window.confirm(
-      `确认导出系列 ${meta.series} 为 XLSX 吗？将导出 ${meta.rowCount} 行数据。`
+      `确认导出系列 ${meta.series} 为 XLSX 吗？将导出 ${meta.rowCount} 行数据`
     );
     if (!confirmed) {
       return;
@@ -564,7 +564,7 @@ export default function App(): JSX.Element {
         headers: meta.headers,
         rows: seriesRows
       });
-      setInfo(`系列 ${meta.series} 已导出为 XLSX（共 ${seriesRows.length} 行）。`);
+      setInfo(`系列 ${meta.series} 已导出为 XLSX（共 ${seriesRows.length} 行）`);
     } catch (exportError) {
       setError(exportError instanceof Error ? exportError.message : `导出系列 ${meta.series} 失败`);
     } finally {
@@ -578,7 +578,7 @@ export default function App(): JSX.Element {
     }
 
     const confirmed = window.confirm(
-      `确认清空系列 ${meta.series} 吗？将删除该系列 ${meta.rowCount} 行数据，且无法撤销。`
+      `确认清空系列 ${meta.series} 吗？将删除该系列 ${meta.rowCount} 行数据，且无法撤销`
     );
     if (!confirmed) {
       return;
@@ -598,7 +598,7 @@ export default function App(): JSX.Element {
       }
 
       await refreshSeriesList();
-      setInfo(`系列 ${meta.series} 已清空，删除 ${removedRows} 行。`);
+      setInfo(`系列 ${meta.series} 已清空，删除 ${removedRows} 行`);
     } catch (clearError) {
       setError(clearError instanceof Error ? clearError.message : `清空系列 ${meta.series} 失败`);
     } finally {
@@ -630,7 +630,7 @@ export default function App(): JSX.Element {
     setCompareError('');
 
     if (groupColumns.length === 0) {
-      setCompareError('请先选择“数据组维度列”，再添加数据组。');
+      setCompareError('请先选择“数据组维度列”，再添加数据组');
       return;
     }
 
@@ -641,7 +641,7 @@ export default function App(): JSX.Element {
     setCompareError('');
 
     if (groupColumns.length === 0) {
-      setCompareError('请先选择数据组维度列。');
+      setCompareError('请先选择数据组维度列');
       return;
     }
 
@@ -650,12 +650,12 @@ export default function App(): JSX.Element {
     );
 
     if (activeGroups.length < 2) {
-      setCompareError('请至少配置 2 个有效数据组（每个维度列都要填写值）。');
+      setCompareError('请至少配置 2 个有效数据组（每个维度列都要填写值）');
       return;
     }
 
     if (infoColumnsForComparison.length === 0) {
-      setCompareError('当前没有可比对的信息列，请先调整维度列或信息列。');
+      setCompareError('当前没有可比对的信息列，请先调整维度列或信息列');
       return;
     }
 
@@ -718,7 +718,7 @@ export default function App(): JSX.Element {
       <section className="card">
         <div className="card-head">
           <h3>数据导入</h3>
-          <span className="muted">同系列可选：整表覆盖 或 增量追加（整行去重）</span>
+          <span className="muted"></span>
         </div>
 
         <div className="grid two">
@@ -787,8 +787,8 @@ export default function App(): JSX.Element {
             </div>
             <div className="merge-summary muted">
               {importMode === 'append'
-                ? '当前策略：增量追加。仅新增“数据库中未存在的整行”，重复整行会自动跳过。'
-                : '当前策略：整表覆盖。再次导入同系列会用新文件替换旧数据。'}
+                ? '当前策略：增量追加仅新增“数据库中未存在的整行”，重复整行会自动跳过'
+                : '当前策略：整表覆盖再次导入同系列会用新文件替换旧数据'}
             </div>
             <div className="actions">
               <button
@@ -821,7 +821,7 @@ export default function App(): JSX.Element {
       <>
         <section className="card">
           <div className="card-head">
-            <h3>结果观察</h3>
+            <h3>数据查看</h3>
             <button type="button" className="button secondary" onClick={() => void refreshSeriesList()}>
               刷新系列列表
             </button>
@@ -876,7 +876,7 @@ export default function App(): JSX.Element {
           </div>
 
           {viewHeaders.length === 0 ? (
-            <p className="muted">请选择系列后再创建数据组。</p>
+            <p className="muted">请选择系列后再创建数据组</p>
           ) : (
             <>
               <div className="grid two">
@@ -955,7 +955,7 @@ export default function App(): JSX.Element {
                 </label>
               </div>
 
-              <p className="muted">以上取值方式仅在“匹配行数大于 1”时生效。</p>
+              <p className="muted">以上取值方式仅在“匹配行数大于 1”时生效</p>
 
               <div className="card top-gap">
                 <div className="card-head">
@@ -981,9 +981,9 @@ export default function App(): JSX.Element {
                 </div>
 
                 {groupColumns.length === 0 ? (
-                  <p className="muted">请先在上方选择至少 1 个维度列。</p>
+                  <p className="muted">请先在上方选择至少 1 个维度列</p>
                 ) : compareGroups.length === 0 ? (
-                  <p className="muted">点击“添加数据组”开始配置。</p>
+                  <p className="muted">点击“添加数据组”开始配置</p>
                 ) : (
                   <div className="group-list">
                     {compareGroups.map((group, index) => (
@@ -1035,7 +1035,7 @@ export default function App(): JSX.Element {
                     </div>
 
                     {chartableColumns.length === 0 ? (
-                      <p className="muted">当前结果没有可绘图的数值列，请调整信息列后重试。</p>
+                      <p className="muted">当前结果没有可绘图的数值列，请调整信息列后重试</p>
                     ) : (
                       <>
                         <div className="grid two">
@@ -1162,11 +1162,11 @@ export default function App(): JSX.Element {
           </div>
 
           {!showRawData ? (
-            <p className="muted">默认收起，防止数据淹没页面。需要时再展开查看。</p>
+            <p className="muted"></p>
           ) : loading ? (
             <p>加载中...</p>
           ) : viewHeaders.length === 0 ? (
-            <p className="muted">请选择一个系列查看数据。</p>
+            <p className="muted">请选择一个系列查看数据</p>
           ) : (
             <>
               <div className="table-wrap data-table-wrap">
@@ -1191,7 +1191,7 @@ export default function App(): JSX.Element {
               </div>
 
               {filteredRows.length > MAX_RENDER_ROWS && (
-                <p className="muted">仅展示前 {MAX_RENDER_ROWS} 条，请继续筛选缩小范围。</p>
+                <p className="muted">仅展示前 {MAX_RENDER_ROWS} 条，请继续筛选缩小范围</p>
               )}
             </>
           )}
@@ -1211,7 +1211,7 @@ export default function App(): JSX.Element {
         </div>
 
         <div className="danger-zone">
-          <p>清空操作会删除本地数据库内所有系列和数据，用于排除错误数据后的重建。该操作不可恢复。</p>
+          <p>清空操作会删除本地数据库内所有系列和数据，操作不可恢复</p>
           <button type="button" className="button danger" onClick={() => void handleClearAll()}>
             清空全部数据
           </button>
@@ -1267,8 +1267,7 @@ export default function App(): JSX.Element {
   return (
     <main className="container">
       <header className="hero">
-        <h1>Xls Data View</h1>
-        <p>结果观察、数据导入、设置清库三页分离。导入时自动行主键，确保每行都保留。</p>
+        <h1>抽象表格数据查看器</h1>
       </header>
 
       <nav className="top-nav">
@@ -1277,7 +1276,7 @@ export default function App(): JSX.Element {
           className={`nav-button ${page === 'results' ? 'active' : ''}`}
           onClick={() => navigate('results')}
         >
-          结果观察
+          数据查看
         </button>
         <button
           type="button"

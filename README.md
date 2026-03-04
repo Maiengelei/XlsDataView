@@ -1,6 +1,6 @@
 # Xls Data View
 
-基于 TypeScript 的本地表格导入与筛选工具。
+基于 TypeScript 的本地表格导入与筛选工具
 
 ## 功能
 
@@ -35,7 +35,7 @@ npm run dev
 
 ## Windows 打包（桌面应用）
 
-已接入 Electron + electron-builder，可打包独立 Windows 应用。
+已接入 Electron + electron-builder，可打包独立 Windows 应用
 
 ### 首次准备
 
@@ -64,8 +64,8 @@ npm run pack:win:portable
 ```
 
 说明：
-- 建议在 Windows 系统上执行 `pack:win`，产物兼容性最好。
-- 应用数据默认保存在 Electron 用户目录（长期使用可持续保留本地数据库）。
+- 建议在 Windows 系统上执行 `pack:win`，产物兼容性最好
+- 应用数据默认保存在 Electron 用户目录（长期使用可持续保留本地数据库）
 
 ## GitHub Actions 手动发布 EXE
 
@@ -100,4 +100,4 @@ npm run pack:win:portable
 
 ## 清空全部数据
 
-点击“清空全部数据”会删除 IndexedDB 中所有系列与行数据，且不可恢复。
+点击“清空全部数据”会删除 IndexedDB 中所有系列与行数据，且不可恢复

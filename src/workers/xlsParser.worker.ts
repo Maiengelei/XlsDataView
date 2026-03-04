@@ -143,7 +143,7 @@ async function parseFile(fileName: string, buffer: ArrayBuffer): Promise<ParsedS
 
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) {
-    throw new Error('文件中没有找到任何工作表。');
+    throw new Error('文件中没有找到任何工作表');
   }
 
   const worksheet = workbook.Sheets[sheetName];
@@ -157,7 +157,7 @@ async function parseFile(fileName: string, buffer: ArrayBuffer): Promise<ParsedS
   postProgress(40, '正在解析表头...');
   const headerRowIndex = grid.findIndex((row) => Array.isArray(row) && !isRowEmpty(row));
   if (headerRowIndex < 0) {
-    throw new Error('文件中没有有效的表头。');
+    throw new Error('文件中没有有效的表头');
   }
 
   const headerRow = grid[headerRowIndex] ?? [];
