@@ -116,12 +116,16 @@ select {
   z-index: 120;
 }
 
+.searchable-select:focus-within {
+  z-index: 1000;
+}
+
 .searchable-select-menu {
   position: absolute;
   left: 0;
   right: 0;
   top: calc(100% + 4px);
-  z-index: 140;
+  z-index: 1200;
   max-height: 240px;
   overflow: auto;
   border: 1px solid #cbd5e1;
