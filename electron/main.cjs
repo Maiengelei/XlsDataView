@@ -4,6 +4,19 @@ const path = require('path');
 
 const DEV_SERVER_URL = 'http://127.0.0.1:5173';
 
+function configureUserDataPath() {
+  const baseDir = app.isPackaged
+    ? process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(process.execPath)
+    : app.getAppPath();
+
+  const userDataPath = path.join(baseDir, '.xls-data-view');
+  fs.mkdirSync(userDataPath, { recursive: true });
+  app.setPath('userData', userDataPath);
+  app.setPath('sessionData', path.join(userDataPath, 'session'));
+}
+
+configureUserDataPath();
+
 function resolveRendererEntry() {
   const candidates = [
     path.join(app.getAppPath(), 'dist', 'index.html'),

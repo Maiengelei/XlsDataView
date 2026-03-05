@@ -20,6 +20,7 @@ type AppPage = 'results' | 'import' | 'settings';
 type ImportMode = 'snapshot' | 'append';
 type NumericAggregateMode = 'sum' | 'max' | 'min' | 'avg' | 'first' | 'last';
 type TextAggregateMode = 'first' | 'last' | 'uniqueJoin';
+type RawDataSortOrder = 'default' | 'asc' | 'desc';
 
 interface CompareGroup {
   id: string;
@@ -97,6 +98,21 @@ function uniqueValues(rows: RowData[], column: string): string[] {
         .filter((value) => value !== '')
     )
   ).sort((left, right) => left.localeCompare(right, 'zh-CN'));
+}
+
+
+function compareRawDataValue(left: unknown, right: unknown): number {
+  const leftText = String(left ?? '').trim();
+  const rightText = String(right ?? '').trim();
+
+  const leftNumber = asNumber(leftText);
+  const rightNumber = asNumber(rightText);
+
+  if (leftNumber !== null && rightNumber !== null) {
+    return leftNumber - rightNumber;
+  }
+
+  return leftText.localeCompare(rightText, 'zh-CN');
 }
 
 function summarizeColumn(
@@ -232,6 +248,8 @@ export default function App(): JSX.Element {
 
   const [showSeriesMeta, setShowSeriesMeta] = useState(false);
   const [showRawData, setShowRawData] = useState(false);
+  const [rawDataSortColumn, setRawDataSortColumn] = useState('');
+  const [rawDataSortOrder, setRawDataSortOrder] = useState<RawDataSortOrder>('default');
 
   const [groupColumns, setGroupColumns] = useState<string[]>([]);
   const [compareInfoColumns, setCompareInfoColumns] = useState<string[]>([]);
@@ -254,7 +272,22 @@ export default function App(): JSX.Element {
 
   const viewHeaders = selectedMeta?.headers ?? [];
   const filteredRows = useMemo(() => applyFilters(rows, filters), [rows, filters]);
-  const displayRows = useMemo(() => filteredRows.slice(0, MAX_RENDER_ROWS), [filteredRows]);
+
+  const sortedRows = useMemo(() => {
+    if (rawDataSortOrder === 'default' || !rawDataSortColumn) {
+      return filteredRows;
+    }
+
+    const sorted = [...filteredRows];
+    sorted.sort((left, right) => {
+      const result = compareRawDataValue(left[rawDataSortColumn], right[rawDataSortColumn]);
+      return rawDataSortOrder === 'asc' ? result : -result;
+    });
+
+    return sorted;
+  }, [filteredRows, rawDataSortOrder, rawDataSortColumn]);
+
+  const displayRows = useMemo(() => sortedRows.slice(0, MAX_RENDER_ROWS), [sortedRows]);
 
   const totalRowsInDb = useMemo(
     () => seriesList.reduce((sum, item) => sum + item.rowCount, 0),
@@ -379,6 +412,16 @@ export default function App(): JSX.Element {
   useEffect(() => {
     setGroupColumns((current) => current.filter((column) => viewHeaders.includes(column)));
     setCompareInfoColumns((current) => current.filter((column) => viewHeaders.includes(column)));
+  }, [viewHeaders]);
+
+  useEffect(() => {
+    if (viewHeaders.length === 0) {
+      setRawDataSortColumn('');
+      setRawDataSortOrder('default');
+      return;
+    }
+
+    setRawDataSortColumn((current) => (viewHeaders.includes(current) ? current : viewHeaders[0]));
   }, [viewHeaders]);
 
   useEffect(() => {
@@ -1166,6 +1209,43 @@ export default function App(): JSX.Element {
             <p className="muted">请选择一个系列查看数据</p>
           ) : (
             <>
+              <div className="raw-data-toolbar">
+                <label>
+                  排序列
+                  <SearchableSelect
+                    options={toOptions(viewHeaders)}
+                    value={rawDataSortColumn}
+                    onChange={setRawDataSortColumn}
+                  />
+                </label>
+
+                <div className="raw-data-toolbar-actions">
+                  <button
+                    type="button"
+                    className="button secondary"
+                    onClick={() => setRawDataSortOrder('asc')}
+                    disabled={!rawDataSortColumn}
+                  >
+                    升序
+                  </button>
+                  <button
+                    type="button"
+                    className="button secondary"
+                    onClick={() => setRawDataSortOrder('desc')}
+                    disabled={!rawDataSortColumn}
+                  >
+                    降序
+                  </button>
+                  <button
+                    type="button"
+                    className="button"
+                    onClick={() => setRawDataSortOrder('default')}
+                  >
+                    还原默认
+                  </button>
+                </div>
+              </div>
+
               <div className="table-wrap data-table-wrap">
                 <table className="data-table">
                   <thead>
