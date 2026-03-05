@@ -243,7 +243,7 @@ export default function App(): JSX.Element {
   const [textAggregateMode, setTextAggregateMode] = useState<TextAggregateMode>('first');
   const [chartType, setChartType] = useState<MultiChartType>('bar');
   const [barOrientation, setBarOrientation] = useState<BarOrientation>('vertical');
-  const [chartXAxisTitle, setChartXAxisTitle] = useState('数据组');
+  const [chartXAxisTitle, setChartXAxisTitle] = useState('信息列');
   const [chartYAxisTitle, setChartYAxisTitle] = useState('汇总值');
   const [chartColumns, setChartColumns] = useState<string[]>([]);
 
@@ -305,19 +305,16 @@ export default function App(): JSX.Element {
     [chartColumns, chartableColumns]
   );
 
-  const chartCategories = useMemo(
-    () => compareResult?.rows.map((row) => row.groupLabel) ?? [],
-    [compareResult]
-  );
+  const chartCategories = useMemo(() => selectedChartColumns, [selectedChartColumns]);
 
   const chartSeries = useMemo(() => {
     if (!compareResult) {
       return [];
     }
 
-    return selectedChartColumns.map((column) => ({
-      name: column,
-      values: compareResult.rows.map((row) => {
+    return compareResult.rows.map((row) => ({
+      name: row.groupLabel,
+      values: selectedChartColumns.map((column) => {
         const value = row.values[column];
         if (typeof value === 'number') {
           return value;
@@ -1073,7 +1070,7 @@ export default function App(): JSX.Element {
                             <input
                               type="text"
                               value={chartXAxisTitle}
-                              placeholder="例如：数据组"
+                              placeholder="例如：信息列"
                               onChange={(event) => setChartXAxisTitle(event.target.value)}
                             />
                           </label>
