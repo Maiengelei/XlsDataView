@@ -116,12 +116,16 @@ select {
   z-index: 120;
 }
 
+.searchable-select:focus-within {
+  z-index: 1000;
+}
+
 .searchable-select-menu {
   position: absolute;
   left: 0;
   right: 0;
   top: calc(100% + 4px);
-  z-index: 140;
+  z-index: 1200;
   max-height: 240px;
   overflow: auto;
   border: 1px solid #cbd5e1;
@@ -364,6 +368,22 @@ th {
   background: #f1f5f9;
   position: sticky;
   top: 0;
+}
+
+
+.raw-data-toolbar {
+  display: flex;
+  gap: 0.75rem;
+  align-items: end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-bottom: 0.65rem;
+}
+
+.raw-data-toolbar-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .data-table-wrap {
